@@ -1,125 +1,187 @@
-import React, { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, Stars } from '@react-three/drei';
-import useShunyaStore from './store/useShunyaStore';
-import usePathStore from './store/usePathStore';
+import { EffectComposer, Bloom, Noise } from '@react-three/postprocessing';
 import Polyhedron from './components/Polyhedron';
 import Oracle from './components/Oracle';
 import PathwayMap from './components/PathwayMap';
+import SoundEngine from './components/SoundEngine';
+import useShunyaStore from './store/useShunyaStore';
+import usePathStore from './store/usePathStore';
 
-// Simple UI Component for the Main Menu
-const MainMenu = ({ onSelectMode }) => (
-  <div className="absolute inset-0 flex flex-col items-center justify-center z-50 bg-black/80 backdrop-blur-sm">
-    <h1 className="text-4xl font-thin text-white mb-8 tracking-[0.5em]">SHUNYA</h1>
-    <div className="flex gap-6">
-      <button 
-        onClick={() => onSelectMode('ORACLE')}
-        className="px-8 py-4 border border-white/20 hover:bg-white/10 text-white rounded-lg transition-all backdrop-blur-md"
-      >
-        <span className="block text-xl mb-1">Oracle</span>
-        <span className="text-xs text-gray-400">Quick Relief</span>
-      </button>
-      <button 
-        onClick={() => onSelectMode('PATH')}
-        className="px-8 py-4 border border-cyan-500/30 hover:bg-cyan-500/10 text-cyan-400 rounded-lg transition-all backdrop-blur-md shadow-[0_0_15px_rgba(6,182,212,0.1)]"
-      >
-        <span className="block text-xl mb-1">Ascension</span>
-        <span className="text-xs text-cyan-300/70">The 7 Stages</span>
-      </button>
-    </div>
-  </div>
-);
-
-export default function App() {
-  // We need a local state to know which "Screen" we are on
-  // Screens: 'MENU' | 'ORACLE' | 'PATH' | 'TIMER'
-  const [screen, setScreen] = useState('MENU');
-  
-  // Get stores
-  const { status, reset, startTimer, setDuration, setTechnique } = useShunyaStore();
+function App() {
+  const { timeLeft, status, selectedMeditation, start, pause, reset, tick } = useShunyaStore();
   const { completeStage } = usePathStore();
-  const [activeStageId, setActiveStageId] = useState(null);
+  
+  const [currentView, setCurrentView] = useState('pathway'); // 'pathway' | 'oracle' | 'session' | 'complete'
+  const [currentStage, setCurrentStage] = useState(null);
 
-  // If the timer finishes, handle logic based on mode
+  // Handle timer tick
   useEffect(() => {
-    if (status === 'FINISHED') {
-      if (activeStageId) {
-        completeStage(activeStageId); // Unlock next stage if in Path mode
-      }
-      // Optional: Play a gong sound here
-      setTimeout(() => {
-         setScreen('MENU'); // Go back to menu after 5 seconds
-         reset();
-      }, 5000);
+    if (status === 'running') {
+      const interval = setInterval(() => {
+        tick();
+      }, 1000);
+      return () => clearInterval(interval);
     }
-  }, [status, activeStageId, completeStage, reset]);
+  }, [status, tick]);
 
-  // Handlers
-  const handleStartPathSession = (stage) => {
-    setDuration(stage.duration);
-    setTechnique(stage); // Store the instruction
-    setActiveStageId(stage.id);
-    setScreen('TIMER');
-    startTimer();
+  // Handle timer completion
+  useEffect(() => {
+    if (status === 'finished' && currentStage) {
+      // Mark stage as complete
+      completeStage(currentStage.id);
+      setCurrentView('complete');
+    }
+  }, [status, currentStage, completeStage]);
+
+  // Format time as MM:SS
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   };
 
-  const handleStartOracleSession = (meditation) => {
-    setDuration(meditation.duration);
-    setTechnique(meditation);
-    setActiveStageId(null); // Oracle doesn't have "stages" to unlock
-    setScreen('TIMER');
-    startTimer();
+  // Handle starting a pathway stage
+  const handleStartSession = (stage) => {
+    setCurrentStage(stage);
+    setCurrentView('oracle');
+    // Reset timer with stage duration
+    reset();
+  };
+
+  // Handle beginning meditation after Oracle selection
+  const handleBeginMeditation = () => {
+    setCurrentView('session');
+    start();
+  };
+
+  // Return to pathway map
+  const handleReturnToMap = () => {
+    setCurrentView('pathway');
+    setCurrentStage(null);
+    reset();
   };
 
   return (
-    <div className="w-full h-screen bg-black relative overflow-hidden font-sans">
-      
-      {/* The 3D Scene is ALWAYS visible in the background */}
-      <div className="absolute inset-0 z-0">
-        <Canvas camera={{ position: [0, 0, 4] }}>
-          <ambientLight intensity={0.5} />
-          <pointLight position={[10, 10, 10]} intensity={1} />
-          <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
-          <Polyhedron />
-          <OrbitControls enableZoom={false} autoRotate autoRotateSpeed={0.5} />
-        </Canvas>
-      </div>
+    <div className="w-full h-screen bg-black relative overflow-hidden">
+      {/* 3D Canvas - Always visible in background */}
+      <Canvas camera={{ position: [0, 0, 6], fov: 50 }}>
+        <ambientLight intensity={0.5} />
+        <Polyhedron />
+        
+        {/* Post-processing effects */}
+        <EffectComposer>
+          <Bloom
+            intensity={1.5}
+            luminanceThreshold={0}
+            luminanceSmoothing={0.9}
+            height={300}
+          />
+          <Noise opacity={0.02} />
+        </EffectComposer>
+      </Canvas>
 
-      {/* UI Overlays based on Screen State */}
-      
-      {screen === 'MENU' && (
-        <MainMenu onSelectMode={setScreen} />
+      {/* Binaural Sound Engine */}
+      <SoundEngine status={status} />
+
+      {/* Pathway Map View */}
+      {currentView === 'pathway' && (
+        <PathwayMap onStartSession={handleStartSession} />
       )}
 
-      {screen === 'ORACLE' && (
-        <div className="absolute inset-0 z-40">
-           <button onClick={() => setScreen('MENU')} className="absolute top-4 left-4 text-white/50 hover:text-white">← Back</button>
-           <Oracle onStart={handleStartOracleSession} />
+      {/* Oracle View - Mood selection for current stage */}
+      {currentView === 'oracle' && currentStage && (
+        <div className="absolute inset-0 z-10">
+          <Oracle onBegin={handleBeginMeditation} />
+          <button
+            onClick={handleReturnToMap}
+            className="absolute top-8 left-8 px-4 py-2 bg-black/40 backdrop-blur-md border border-white/10 text-white/70 rounded-lg text-sm font-light hover:bg-black/60 transition"
+          >
+            ← Back to Pathway
+          </button>
         </div>
       )}
 
-      {screen === 'PATH' && (
-        <div className="absolute inset-0 z-40">
-           <button onClick={() => setScreen('MENU')} className="absolute top-4 left-4 text-white/50 hover:text-white">← Back</button>
-           <PathwayMap onStart={handleStartPathSession} />
+      {/* Session View - Active meditation timer */}
+      {currentView === 'session' && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+          <div className="text-center mb-8">
+            {currentStage && (
+              <div className="mb-4">
+                <div className="text-cyan-400/50 text-sm font-light mb-1">
+                  {currentStage.title}
+                </div>
+                <div className="text-cyan-300/70 text-xs">
+                  {currentStage.technique}
+                </div>
+              </div>
+            )}
+            {selectedMeditation && (
+              <h2 className="text-cyan-300 text-xl font-thin mb-4 opacity-70">
+                {selectedMeditation.title}
+              </h2>
+            )}
+            <h1 className="text-white text-8xl font-thin mb-8 pointer-events-auto">
+              {formatTime(timeLeft)}
+            </h1>
+          </div>
+          
+          {/* Controls */}
+          <div className="flex gap-4 pointer-events-auto">
+            {status !== 'running' ? (
+              <button
+                onClick={start}
+                className="px-6 py-3 bg-white/10 backdrop-blur-md border border-white/20 text-white font-light rounded-lg hover:bg-white/20 transition"
+              >
+                RESUME
+              </button>
+            ) : (
+              <button
+                onClick={pause}
+                className="px-6 py-3 bg-white/10 backdrop-blur-md border border-white/20 text-white font-light rounded-lg hover:bg-white/20 transition"
+              >
+                PAUSE
+              </button>
+            )}
+            
+            <button
+              onClick={handleReturnToMap}
+              className="px-6 py-3 bg-black/40 backdrop-blur-md border border-white/10 text-white/70 font-light rounded-lg hover:bg-black/60 hover:text-white transition"
+            >
+              EXIT
+            </button>
+          </div>
         </div>
       )}
 
-      {screen === 'TIMER' && (
-         <div className="absolute inset-0 z-30 pointer-events-none flex flex-col items-center justify-center">
-            {/* The Timer UI is handled by Polyhedron or a separate overlay, 
-                but we can put the instruction text here */}
-            <div className="absolute bottom-10 px-6 text-center">
-               <h2 className="text-white/80 text-lg font-light tracking-widest mb-2">
-                 {useShunyaStore.getState().technique?.title || "FOCUS"}
-               </h2>
-               <p className="text-white/50 text-sm max-w-md mx-auto">
-                 {useShunyaStore.getState().technique?.instruction}
-               </p>
+      {/* Stage Complete View */}
+      {currentView === 'complete' && currentStage && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+          <div className="bg-black/80 backdrop-blur-xl border border-cyan-500/50 rounded-3xl p-12 max-w-md mx-4 pointer-events-auto shadow-2xl text-center">
+            <div className="mb-6">
+              <div className="text-6xl mb-4 animate-pulse">✨</div>
+              <h2 className="text-white text-3xl font-thin mb-2">
+                Stage Complete
+              </h2>
+              <p className="text-cyan-300 text-lg mb-4">
+                {currentStage.title}
+              </p>
+              <p className="text-white/60 text-sm font-light">
+                You have journeyed deeper into the void.
+              </p>
             </div>
-         </div>
+            
+            <button
+              onClick={handleReturnToMap}
+              className="w-full bg-cyan-500/20 hover:bg-cyan-500/40 border border-cyan-400/50 text-white py-4 rounded-xl font-light text-lg transition-all duration-300 hover:scale-105"
+            >
+              Continue Journey →
+            </button>
+          </div>
+        </div>
       )}
-
     </div>
   );
 }
+
+export default App;
