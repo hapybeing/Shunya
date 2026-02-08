@@ -1,111 +1,77 @@
-import { useState } from 'react';
+import React from 'react';
 import usePathStore from '../store/usePathStore';
 
-export default function PathwayMap({ onStartSession }) {
-  const { pathway, resetProgress } = usePathStore();
-  const [selectedStage, setSelectedStage] = useState(null);
-
-  const handleStageClick = (stage) => {
-    if (!stage.locked) {
-      setSelectedStage(stage);
-    }
-  };
-
-  const handleStartSession = () => {
-    if (selectedStage) {
-      onStartSession(selectedStage);
-    }
-  };
+const PathwayMap = ({ onStart }) => {
+  const { stages, completedStages } = usePathStore();
 
   return (
-    <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
-      <div className="bg-black/60 backdrop-blur-xl border border-cyan-500/30 rounded-3xl p-8 max-w-2xl w-full mx-4 pointer-events-auto shadow-2xl">
+    // Added overflow-y-auto and pointer-events-auto to fix scrolling/clicking
+    <div className="w-full h-full absolute inset-0 z-50 overflow-y-auto bg-gradient-to-b from-black/90 to-black/40 backdrop-blur-sm pointer-events-auto">
+      <div className="flex flex-col items-center min-h-screen py-20 px-4">
+        
         {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-white text-4xl font-thin mb-2 tracking-wider">
-            {pathway.title}
-          </h1>
-          <p className="text-cyan-300/70 text-sm font-light">
-            {pathway.description}
-          </p>
-        </div>
+        <h2 className="text-3xl font-light text-white tracking-[0.2em] mb-2 text-center">
+          THE PATH
+        </h2>
+        <p className="text-gray-400 text-sm mb-16 text-center max-w-xs font-mono">
+          Vigyan Bhairava Tantra
+        </p>
 
-        {/* Pathway Constellation */}
-        <div className="relative py-8">
-          {/* Vertical connecting line */}
-          <div className="absolute left-1/2 top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-cyan-500/30 to-transparent transform -translate-x-1/2" />
+        {/* The Constellation Line */}
+        <div className="relative flex flex-col items-center gap-12 w-full max-w-md pb-32">
           
-          {/* Stage dots */}
-          <div className="space-y-6">
-            {pathway.stages.map((stage, index) => (
-              <div key={stage.id} className="relative flex items-center justify-center">
-                {/* Stage number label */}
-                <div className="absolute left-8 text-cyan-400/50 text-xs font-light">
-                  Stage {index + 1}
-                </div>
-                
-                {/* Stage dot */}
+          {/* Vertical Connecting Line */}
+          <div className="absolute top-4 bottom-20 left-1/2 w-0.5 bg-gradient-to-b from-cyan-500/50 via-cyan-900/20 to-transparent -translate-x-1/2 z-0" />
+
+          {stages.map((stage, index) => {
+            // Determine state
+            const isCompleted = completedStages.includes(stage.id);
+            const isNext = !isCompleted && (index === 0 || completedStages.includes(stages[index - 1].id));
+            const isLocked = !isCompleted && !isNext;
+
+            return (
+              <div 
+                key={stage.id} 
+                className={`relative z-10 w-full flex items-center ${index % 2 === 0 ? 'justify-start' : 'justify-end'}`}
+              >
+                {/* The clickable "Star" Node */}
                 <button
-                  onClick={() => handleStageClick(stage)}
-                  disabled={stage.locked}
+                  disabled={isLocked}
+                  onClick={() => onStart(stage)}
                   className={`
-                    relative z-10 w-6 h-6 rounded-full transition-all duration-300
-                    ${stage.completed 
-                      ? 'bg-cyan-400 shadow-lg shadow-cyan-400/50' 
-                      : stage.locked 
-                        ? 'bg-gray-600/30 border border-gray-500/30 cursor-not-allowed'
-                        : 'bg-white border-2 border-white/50 animate-pulse cursor-pointer hover:scale-125 shadow-lg shadow-white/50'
-                    }
-                    ${selectedStage?.id === stage.id && !stage.locked ? 'ring-4 ring-cyan-400/50 scale-125' : ''}
+                    absolute left-1/2 -translate-x-1/2 w-12 h-12 rounded-full flex items-center justify-center transition-all duration-500
+                    ${isCompleted ? 'bg-cyan-500 shadow-[0_0_20px_#06b6d4]' : ''}
+                    ${isNext ? 'bg-white shadow-[0_0_30px_white] animate-pulse scale-110' : ''}
+                    ${isLocked ? 'bg-gray-800 border border-gray-700' : ''}
                   `}
                 >
-                  {stage.completed && (
-                    <div className="absolute inset-0 flex items-center justify-center text-black text-xs">
-                      ✓
-                    </div>
-                  )}
+                  {isCompleted && <span className="text-black font-bold">✓</span>}
+                  {isLocked && <span className="text-gray-600 text-xs">{index + 1}</span>}
                 </button>
 
-                {/* Stage info on hover/selection */}
-                {(selectedStage?.id === stage.id || (!stage.locked && !selectedStage)) && (
-                  <div className="absolute left-1/2 transform translate-x-8 bg-black/80 backdrop-blur-md border border-cyan-500/30 rounded-lg px-4 py-2 min-w-[200px]">
-                    <h3 className="text-white text-sm font-light mb-1">
-                      {stage.title}
-                    </h3>
-                    <p className="text-cyan-300/60 text-xs">
-                      {stage.duration}s · {stage.technique}
-                    </p>
-                  </div>
-                )}
+                {/* The Info Card */}
+                <div 
+                  className={`
+                    w-[42%] p-4 rounded-xl backdrop-blur-md border transition-all duration-500
+                    ${isNext ? 'bg-white/10 border-white/40 opacity-100 translate-y-0' : ''}
+                    ${isCompleted ? 'bg-cyan-900/20 border-cyan-500/30 opacity-70' : ''}
+                    ${isLocked ? 'opacity-0 translate-y-4 pointer-events-none' : ''}
+                  `}
+                >
+                  <h3 className={`font-medium ${isNext ? 'text-white' : 'text-cyan-400'}`}>
+                    {stage.title}
+                  </h3>
+                  <p className="text-xs text-gray-400 mt-1 font-mono">
+                    {Math.floor(stage.duration / 60)} MIN
+                  </p>
+                </div>
               </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Action buttons */}
-        <div className="mt-8 space-y-3">
-          {selectedStage && !selectedStage.locked && (
-            <button
-              onClick={handleStartSession}
-              className="w-full bg-cyan-500/20 hover:bg-cyan-500/40 border border-cyan-400/50 text-white py-4 rounded-xl font-light text-lg transition-all duration-300 hover:scale-105"
-            >
-              Begin {selectedStage.title} →
-            </button>
-          )}
-          
-          <div className="flex gap-3">
-            <button
-              onClick={resetProgress}
-              className="flex-1 bg-red-500/10 hover:bg-red-500/20 border border-red-400/30 text-red-300 py-2 rounded-lg text-sm font-light transition-all"
-            >
-              Reset Progress
-            </button>
-            <div className="flex-1 text-center py-2 text-cyan-400/50 text-sm">
-              {pathway.stages.filter(s => s.completed).length} / {pathway.stages.length} Complete
-            </div>
-          </div>
+            );
+          })}
         </div>
       </div>
     </div>
   );
-}
+};
+
+export default PathwayMap;
