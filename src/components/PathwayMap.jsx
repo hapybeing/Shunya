@@ -4,20 +4,29 @@ import usePathStore from '../store/usePathStore';
 const PathwayMap = ({ onStart }) => {
   const { stages, completedStages } = usePathStore();
 
+  // Helper to handle both Click and Touch to ensure it fires
+  const handleInteraction = (e, stage, isUnlocked) => {
+    e.stopPropagation(); // Stop the event from bubbling to the 3D canvas
+    if (isUnlocked) {
+      onStart(stage);
+    }
+  };
+
   return (
-    <div className="absolute inset-0 z-50 overflow-y-auto bg-black/90 backdrop-blur-md pointer-events-auto">
-      <div className="flex flex-col items-center min-h-screen py-20 px-4">
+    <div className="absolute inset-0 z-[100] overflow-y-auto bg-black/95 pointer-events-auto touch-pan-y">
+      <div className="flex flex-col items-center min-h-screen py-24 px-4">
         
-        <h2 className="text-3xl font-light text-white tracking-[0.2em] mb-2 text-center font-['Syncopate']">
+        <h2 className="text-3xl text-white tracking-[0.2em] mb-2 text-center font-bold">
           THE PATH
         </h2>
-        <p className="text-gray-400 text-xs mb-16 text-center max-w-xs font-mono tracking-widest uppercase">
-          Vigyan Bhairava Tantra
+        <p className="text-gray-500 text-xs mb-16 tracking-widest uppercase">
+          Select Stage 1
         </p>
 
-        <div className="relative flex flex-col items-center gap-12 w-full max-w-md pb-32">
-          {/* Vertical Line */}
-          <div className="absolute top-4 bottom-20 left-1/2 w-px bg-gradient-to-b from-cyan-500/50 via-cyan-900/20 to-transparent -translate-x-1/2" />
+        <div className="relative flex flex-col items-center gap-16 w-full max-w-md pb-40">
+          
+          {/* The Vertical Line */}
+          <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-gray-800 -translate-x-1/2 z-0" />
 
           {stages.map((stage, index) => {
             const isCompleted = completedStages.includes(stage.id);
@@ -29,29 +38,35 @@ const PathwayMap = ({ onStart }) => {
                 key={stage.id} 
                 className={`relative z-10 w-full flex items-center ${index % 2 === 0 ? 'justify-start' : 'justify-end'}`}
               >
-                {/* 1. The Dot (Clickable) */}
-                <button
-                  disabled={!isUnlocked}
-                  onClick={() => isUnlocked && onStart(stage)}
+                {/* THE FIX: A massive transparent button that covers both the dot and the text.
+                   This ensures you can't miss it.
+                */}
+                <div 
+                  className="absolute inset-0 z-20"
+                  onTouchEnd={(e) => handleInteraction(e, stage, isUnlocked)}
+                  onClick={(e) => handleInteraction(e, stage, isUnlocked)}
+                ></div>
+
+                {/* Visual: The Center Dot */}
+                <div
                   className={`
-                    absolute left-1/2 -translate-x-1/2 w-4 h-4 rounded-full transition-all duration-500 z-20
-                    ${isCompleted ? 'bg-cyan-400 shadow-[0_0_10px_#22d3ee]' : ''}
-                    ${isNext ? 'bg-white scale-150 shadow-[0_0_20px_white] animate-pulse cursor-pointer' : ''}
-                    ${!isUnlocked ? 'bg-gray-800 border border-gray-700' : ''}
+                    absolute left-1/2 -translate-x-1/2 w-6 h-6 rounded-full border-4 border-black z-10
+                    ${isCompleted ? 'bg-cyan-500' : ''}
+                    ${isNext ? 'bg-white shadow-[0_0_25px_white] animate-pulse' : ''}
+                    ${!isUnlocked ? 'bg-gray-800' : ''}
                   `}
                 />
 
-                {/* 2. The Text Card (NOW CLICKABLE!) */}
+                {/* Visual: The Text Card */}
                 <div 
-                  onClick={() => isUnlocked && onStart(stage)}
                   className={`
-                    w-[45%] p-4 rounded-lg border transition-all duration-500 cursor-pointer
-                    ${isNext ? 'bg-white/5 border-white/20 opacity-100 hover:bg-white/10 active:scale-95' : ''}
-                    ${isCompleted ? 'opacity-50 border-cyan-900/30' : ''}
-                    ${!isUnlocked ? 'opacity-20 border-transparent grayscale cursor-not-allowed' : ''}
+                    w-[45%] p-6 rounded-xl border transition-all duration-300
+                    ${isNext ? 'bg-gray-900 border-white/50' : ''}
+                    ${isCompleted ? 'opacity-50 border-cyan-900' : ''}
+                    ${!isUnlocked ? 'opacity-20 border-transparent' : ''}
                   `}
                 >
-                  <h3 className={`text-sm font-bold tracking-wider mb-1 ${isNext ? 'text-white' : 'text-cyan-600'}`}>
+                  <h3 className={`text-base font-bold mb-1 ${isNext ? 'text-white' : 'text-cyan-600'}`}>
                     {stage.title}
                   </h3>
                   <p className="text-[10px] text-gray-400 font-mono">
