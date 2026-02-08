@@ -8,15 +8,14 @@ const moodOptions = [
   { label: 'Seeking Clarity', value: 'seeking clarity', emoji: '🔍' }
 ];
 
-export default function Oracle() {
+export default function Oracle({ onBegin }) {
   const [showMeditation, setShowMeditation] = useState(false);
   
   const { 
     userMood, 
     selectedMeditation, 
     setMood, 
-    selectMeditation, 
-    start 
+    selectMeditation
   } = useShunyaStore();
 
   const handleMoodSelect = (mood) => {
@@ -26,7 +25,9 @@ export default function Oracle() {
   };
 
   const handleBeginJourney = () => {
-    start();
+    if (onBegin) {
+      onBegin();
+    }
   };
 
   return (
