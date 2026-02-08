@@ -1,101 +1,125 @@
-import { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
+import { OrbitControls, Stars } from '@react-three/drei';
+import useShunyaStore from './store/useShunyaStore';
+import usePathStore from './store/usePathStore';
 import Polyhedron from './components/Polyhedron';
 import Oracle from './components/Oracle';
-import useShunyaStore from './store/useShunyaStore';
+import PathwayMap from './components/PathwayMap';
 
-function App() {
-  const { timeLeft, status, selectedMeditation, start, pause, reset, tick } = useShunyaStore();
+// Simple UI Component for the Main Menu
+const MainMenu = ({ onSelectMode }) => (
+  <div className="absolute inset-0 flex flex-col items-center justify-center z-50 bg-black/80 backdrop-blur-sm">
+    <h1 className="text-4xl font-thin text-white mb-8 tracking-[0.5em]">SHUNYA</h1>
+    <div className="flex gap-6">
+      <button 
+        onClick={() => onSelectMode('ORACLE')}
+        className="px-8 py-4 border border-white/20 hover:bg-white/10 text-white rounded-lg transition-all backdrop-blur-md"
+      >
+        <span className="block text-xl mb-1">Oracle</span>
+        <span className="text-xs text-gray-400">Quick Relief</span>
+      </button>
+      <button 
+        onClick={() => onSelectMode('PATH')}
+        className="px-8 py-4 border border-cyan-500/30 hover:bg-cyan-500/10 text-cyan-400 rounded-lg transition-all backdrop-blur-md shadow-[0_0_15px_rgba(6,182,212,0.1)]"
+      >
+        <span className="block text-xl mb-1">Ascension</span>
+        <span className="text-xs text-cyan-300/70">The 7 Stages</span>
+      </button>
+    </div>
+  </div>
+);
 
-  // Handle timer tick
+export default function App() {
+  // We need a local state to know which "Screen" we are on
+  // Screens: 'MENU' | 'ORACLE' | 'PATH' | 'TIMER'
+  const [screen, setScreen] = useState('MENU');
+  
+  // Get stores
+  const { status, reset, startTimer, setDuration, setTechnique } = useShunyaStore();
+  const { completeStage } = usePathStore();
+  const [activeStageId, setActiveStageId] = useState(null);
+
+  // If the timer finishes, handle logic based on mode
   useEffect(() => {
-    if (status === 'running') {
-      const interval = setInterval(() => {
-        tick();
-      }, 1000);
-      return () => clearInterval(interval);
+    if (status === 'FINISHED') {
+      if (activeStageId) {
+        completeStage(activeStageId); // Unlock next stage if in Path mode
+      }
+      // Optional: Play a gong sound here
+      setTimeout(() => {
+         setScreen('MENU'); // Go back to menu after 5 seconds
+         reset();
+      }, 5000);
     }
-  }, [status, tick]);
+  }, [status, activeStageId, completeStage, reset]);
 
-  // Format time as MM:SS
-  const formatTime = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  // Handlers
+  const handleStartPathSession = (stage) => {
+    setDuration(stage.duration);
+    setTechnique(stage); // Store the instruction
+    setActiveStageId(stage.id);
+    setScreen('TIMER');
+    startTimer();
   };
 
-  // Show Oracle only when timer is idle and not started yet
-  const showOracle = status === 'idle' && timeLeft === (selectedMeditation?.duration || 1500);
+  const handleStartOracleSession = (meditation) => {
+    setDuration(meditation.duration);
+    setTechnique(meditation);
+    setActiveStageId(null); // Oracle doesn't have "stages" to unlock
+    setScreen('TIMER');
+    startTimer();
+  };
 
   return (
-    <div className="w-full h-screen bg-black relative">
-      {/* 3D Canvas - Always visible in background */}
-      <Canvas camera={{ position: [0, 0, 6], fov: 50 }}>
-        <ambientLight intensity={0.5} />
-        <Polyhedron />
-      </Canvas>
+    <div className="w-full h-screen bg-black relative overflow-hidden font-sans">
+      
+      {/* The 3D Scene is ALWAYS visible in the background */}
+      <div className="absolute inset-0 z-0">
+        <Canvas camera={{ position: [0, 0, 4] }}>
+          <ambientLight intensity={0.5} />
+          <pointLight position={[10, 10, 10]} intensity={1} />
+          <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
+          <Polyhedron />
+          <OrbitControls enableZoom={false} autoRotate autoRotateSpeed={0.5} />
+        </Canvas>
+      </div>
 
-      {/* Oracle - Show before meditation starts */}
-      {showOracle && <Oracle />}
+      {/* UI Overlays based on Screen State */}
+      
+      {screen === 'MENU' && (
+        <MainMenu onSelectMode={setScreen} />
+      )}
 
-      {/* Timer Display - Show during meditation */}
-      {!showOracle && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-          <div className="text-center mb-8">
-            {selectedMeditation && (
-              <h2 className="text-cyan-300 text-xl font-thin mb-4 opacity-70">
-                {selectedMeditation.title}
-              </h2>
-            )}
-            <h1 className="text-white text-8xl font-thin mb-8 pointer-events-auto">
-              {formatTime(timeLeft)}
-            </h1>
-          </div>
-          
-          {/* Controls */}
-          <div className="flex gap-4 pointer-events-auto">
-            {status !== 'running' ? (
-              <button
-                onClick={start}
-                className="px-6 py-3 bg-white/10 backdrop-blur-md border border-white/20 text-white font-light rounded-lg hover:bg-white/20 transition"
-              >
-                RESUME
-              </button>
-            ) : (
-              <button
-                onClick={pause}
-                className="px-6 py-3 bg-white/10 backdrop-blur-md border border-white/20 text-white font-light rounded-lg hover:bg-white/20 transition"
-              >
-                PAUSE
-              </button>
-            )}
-            
-            <button
-              onClick={reset}
-              className="px-6 py-3 bg-black/40 backdrop-blur-md border border-white/10 text-white/70 font-light rounded-lg hover:bg-black/60 hover:text-white transition"
-            >
-              RESET
-            </button>
-          </div>
-
-          {/* Status indicator */}
-          {status === 'finished' && (
-            <div className="mt-8 text-center pointer-events-auto">
-              <p className="text-white text-2xl mb-4 animate-pulse">
-                ✨ Journey Complete
-              </p>
-              <button
-                onClick={reset}
-                className="px-8 py-3 bg-cyan-500/20 border border-cyan-400/50 text-cyan-300 rounded-lg hover:bg-cyan-500/40 transition font-light"
-              >
-                Begin Another Journey
-              </button>
-            </div>
-          )}
+      {screen === 'ORACLE' && (
+        <div className="absolute inset-0 z-40">
+           <button onClick={() => setScreen('MENU')} className="absolute top-4 left-4 text-white/50 hover:text-white">← Back</button>
+           <Oracle onStart={handleStartOracleSession} />
         </div>
       )}
+
+      {screen === 'PATH' && (
+        <div className="absolute inset-0 z-40">
+           <button onClick={() => setScreen('MENU')} className="absolute top-4 left-4 text-white/50 hover:text-white">← Back</button>
+           <PathwayMap onStart={handleStartPathSession} />
+        </div>
+      )}
+
+      {screen === 'TIMER' && (
+         <div className="absolute inset-0 z-30 pointer-events-none flex flex-col items-center justify-center">
+            {/* The Timer UI is handled by Polyhedron or a separate overlay, 
+                but we can put the instruction text here */}
+            <div className="absolute bottom-10 px-6 text-center">
+               <h2 className="text-white/80 text-lg font-light tracking-widest mb-2">
+                 {useShunyaStore.getState().technique?.title || "FOCUS"}
+               </h2>
+               <p className="text-white/50 text-sm max-w-md mx-auto">
+                 {useShunyaStore.getState().technique?.instruction}
+               </p>
+            </div>
+         </div>
+      )}
+
     </div>
   );
 }
-
-export default App;
