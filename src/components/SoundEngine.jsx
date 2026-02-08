@@ -1,121 +1,52 @@
 import { useEffect, useRef } from 'react';
+import useShunyaStore from '../store/useShunyaStore';
 
-export default function SoundEngine({ status }) {
-  const audioContextRef = useRef(null);
-  const oscillatorLeftRef = useRef(null);
-  const oscillatorRightRef = useRef(null);
-  const gainNodeRef = useRef(null);
-  const pannerLeftRef = useRef(null);
-  const pannerRightRef = useRef(null);
-  const isPlayingRef = useRef(false);
+export default function SoundEngine() {
+  const { status } = useShunyaStore();
+  const audioCtx = useRef(null);
+  const oscillator = useRef(null);
+  const gainNode = useRef(null);
 
   useEffect(() => {
-    // Initialize Audio Context
-    const initAudio = () => {
-      if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
-        
-        // Create gain node for volume control and fading
-        gainNodeRef.current = audioContextRef.current.createGain();
-        gainNodeRef.current.gain.setValueAtTime(0, audioContextRef.current.currentTime);
-        gainNodeRef.current.connect(audioContextRef.current.destination);
-        
-        // Create stereo panners for binaural effect
-        pannerLeftRef.current = audioContextRef.current.createStereoPanner();
-        pannerLeftRef.current.pan.setValueAtTime(-1, audioContextRef.current.currentTime); // Full left
-        pannerLeftRef.current.connect(gainNodeRef.current);
-        
-        pannerRightRef.current = audioContextRef.current.createStereoPanner();
-        pannerRightRef.current.pan.setValueAtTime(1, audioContextRef.current.currentTime); // Full right
-        pannerRightRef.current.connect(gainNodeRef.current);
-      }
-    };
+    // Initialize Audio Context on first user interaction (browser policy)
+    if (!audioCtx.current) {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      audioCtx.current = new AudioContext();
+      
+      // Create Volume Control
+      gainNode.current = audioCtx.current.createGain();
+      gainNode.current.gain.value = 0; // Start silent
+      gainNode.current.connect(audioCtx.current.destination);
 
-    const play = () => {
-      if (isPlayingRef.current) return;
-      
-      initAudio();
-      
-      const ctx = audioContextRef.current;
-      const currentTime = ctx.currentTime;
-      
-      // Create left oscillator at 110Hz (base frequency)
-      oscillatorLeftRef.current = ctx.createOscillator();
-      oscillatorLeftRef.current.type = 'sine';
-      oscillatorLeftRef.current.frequency.setValueAtTime(110, currentTime);
-      oscillatorLeftRef.current.connect(pannerLeftRef.current);
-      
-      // Create right oscillator at 110Hz + 7Hz (binaural beat at 7Hz - theta wave)
-      oscillatorRightRef.current = ctx.createOscillator();
-      oscillatorRightRef.current.type = 'sine';
-      oscillatorRightRef.current.frequency.setValueAtTime(117, currentTime);
-      oscillatorRightRef.current.connect(pannerRightRef.current);
-      
-      // Start oscillators
-      oscillatorLeftRef.current.start(currentTime);
-      oscillatorRightRef.current.start(currentTime);
-      
-      // Fade in over 3 seconds
-      gainNodeRef.current.gain.cancelScheduledValues(currentTime);
-      gainNodeRef.current.gain.setValueAtTime(0, currentTime);
-      gainNodeRef.current.gain.linearRampToValueAtTime(0.15, currentTime + 3);
-      
-      isPlayingRef.current = true;
-    };
-
-    const stop = () => {
-      if (!isPlayingRef.current) return;
-      
-      const ctx = audioContextRef.current;
-      const currentTime = ctx.currentTime;
-      
-      // Fade out over 2 seconds
-      gainNodeRef.current.gain.cancelScheduledValues(currentTime);
-      gainNodeRef.current.gain.setValueAtTime(gainNodeRef.current.gain.value, currentTime);
-      gainNodeRef.current.gain.linearRampToValueAtTime(0, currentTime + 2);
-      
-      // Stop oscillators after fade out
-      if (oscillatorLeftRef.current) {
-        oscillatorLeftRef.current.stop(currentTime + 2);
-        oscillatorLeftRef.current = null;
-      }
-      if (oscillatorRightRef.current) {
-        oscillatorRightRef.current.stop(currentTime + 2);
-        oscillatorRightRef.current = null;
-      }
-      
-      isPlayingRef.current = false;
-    };
-
-    // Control playback based on status
-    if (status === 'running') {
-      play();
-    } else {
-      stop();
+      // Create Oscillator (The Drone)
+      oscillator.current = audioCtx.current.createOscillator();
+      oscillator.current.type = 'sine';
+      oscillator.current.frequency.setValueAtTime(110, audioCtx.current.currentTime); // 110Hz
+      oscillator.current.connect(gainNode.current);
+      oscillator.current.start();
     }
 
-    // Cleanup on unmount
+    // Logic: Fade In/Out based on Timer Status
+    const now = audioCtx.current.currentTime;
+    
+    if (status === 'RUNNING') {
+      // Resume context if suspended
+      if (audioCtx.current.state === 'suspended') {
+        audioCtx.current.resume();
+      }
+      // Fade In (3 seconds)
+      gainNode.current.gain.cancelScheduledValues(now);
+      gainNode.current.gain.linearRampToValueAtTime(0.15, now + 3); 
+    } else {
+      // Fade Out (2 seconds)
+      gainNode.current.gain.cancelScheduledValues(now);
+      gainNode.current.gain.linearRampToValueAtTime(0, now + 2);
+    }
+
     return () => {
-      stop();
+      // Cleanup not strictly necessary for singleton, but good practice
     };
   }, [status]);
 
-  // Resume audio context on user interaction (browser requirement)
-  useEffect(() => {
-    const resumeAudio = () => {
-      if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
-        audioContextRef.current.resume();
-      }
-    };
-
-    document.addEventListener('click', resumeAudio);
-    document.addEventListener('touchstart', resumeAudio);
-
-    return () => {
-      document.removeEventListener('click', resumeAudio);
-      document.removeEventListener('touchstart', resumeAudio);
-    };
-  }, []);
-
-  return null; // This component doesn't render anything
+  return null; // This component has no visuals
 }
