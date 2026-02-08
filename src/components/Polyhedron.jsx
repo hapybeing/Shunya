@@ -1,7 +1,7 @@
 import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import useTimerStore from '../store/useTimerStore';
+import useShunyaStore from '../store/useShunyaStore';
 
 export default function Polyhedron() {
   const pointsRef = useRef();
@@ -9,10 +9,11 @@ export default function Polyhedron() {
   const geometryRef = useRef();
   
   // Access timer state
-  const timeLeft = useTimerStore((state) => state.timeLeft);
+  const timeLeft = useShunyaStore((state) => state.timeLeft);
+  const selectedMeditation = useShunyaStore((state) => state.selectedMeditation);
   
-  // Total time (25 minutes = 1500 seconds)
-  const TOTAL_TIME = 1500;
+  // Total time - use selected meditation duration or default to 1500
+  const TOTAL_TIME = selectedMeditation ? selectedMeditation.duration : 1500;
   
   // Create geometry and store original positions
   const { geometry, originalPositions, vertexCount } = useMemo(() => {
