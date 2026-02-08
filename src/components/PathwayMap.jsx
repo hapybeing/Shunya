@@ -5,7 +5,6 @@ const PathwayMap = ({ onStart }) => {
   const { stages, completedStages } = usePathStore();
 
   return (
-    // "overflow-y-auto" allows scrolling. "pointer-events-auto" allows clicking.
     <div className="absolute inset-0 z-50 overflow-y-auto bg-black/90 backdrop-blur-md pointer-events-auto">
       <div className="flex flex-col items-center min-h-screen py-20 px-4">
         
@@ -22,7 +21,6 @@ const PathwayMap = ({ onStart }) => {
 
           {stages.map((stage, index) => {
             const isCompleted = completedStages.includes(stage.id);
-            // Unlock if it's the first one OR the previous one is done
             const isUnlocked = index === 0 || completedStages.includes(stages[index - 1].id);
             const isNext = isUnlocked && !isCompleted;
 
@@ -31,25 +29,26 @@ const PathwayMap = ({ onStart }) => {
                 key={stage.id} 
                 className={`relative z-10 w-full flex items-center ${index % 2 === 0 ? 'justify-start' : 'justify-end'}`}
               >
-                {/* Node Button */}
+                {/* 1. The Dot (Clickable) */}
                 <button
                   disabled={!isUnlocked}
                   onClick={() => isUnlocked && onStart(stage)}
                   className={`
-                    absolute left-1/2 -translate-x-1/2 w-4 h-4 rounded-full transition-all duration-500
+                    absolute left-1/2 -translate-x-1/2 w-4 h-4 rounded-full transition-all duration-500 z-20
                     ${isCompleted ? 'bg-cyan-400 shadow-[0_0_10px_#22d3ee]' : ''}
-                    ${isNext ? 'bg-white scale-150 shadow-[0_0_20px_white] animate-pulse' : ''}
+                    ${isNext ? 'bg-white scale-150 shadow-[0_0_20px_white] animate-pulse cursor-pointer' : ''}
                     ${!isUnlocked ? 'bg-gray-800 border border-gray-700' : ''}
                   `}
                 />
 
-                {/* Text Card */}
+                {/* 2. The Text Card (NOW CLICKABLE!) */}
                 <div 
+                  onClick={() => isUnlocked && onStart(stage)}
                   className={`
-                    w-[45%] p-4 rounded-lg border transition-all duration-500
-                    ${isNext ? 'bg-white/5 border-white/20 opacity-100' : ''}
+                    w-[45%] p-4 rounded-lg border transition-all duration-500 cursor-pointer
+                    ${isNext ? 'bg-white/5 border-white/20 opacity-100 hover:bg-white/10 active:scale-95' : ''}
                     ${isCompleted ? 'opacity-50 border-cyan-900/30' : ''}
-                    ${!isUnlocked ? 'opacity-20 border-transparent grayscale' : ''}
+                    ${!isUnlocked ? 'opacity-20 border-transparent grayscale cursor-not-allowed' : ''}
                   `}
                 >
                   <h3 className={`text-sm font-bold tracking-wider mb-1 ${isNext ? 'text-white' : 'text-cyan-600'}`}>
